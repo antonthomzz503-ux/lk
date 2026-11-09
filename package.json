@@ -1,0 +1,11 @@
+{
+  "name": "tiktok-whatsapp-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "got": "latest",
+    "pino": "latest"
+  }
+}
