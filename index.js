@@ -8,6 +8,28 @@ import {
     Browsers
 } from "@whiskeysockets/baileys";
 
+const blacklist = ["62882002954971", "62882000961202"];
+
+async function get_buffer(url) {
+    try {
+        const response = await got.get(url, {
+            responseType: "buffer",
+            timeout: { request: 20000 },
+            retry: { limit: 1 }
+            headers: { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" }
+        });
+
+        const buffer = Buffer.from(response.body);
+
+        if (!buffer.length) throw new Error("Buffer kosong");
+
+        return buffer;
+    } catch (e) {
+        throw new Error(e.message);
+    }
+}
+
+
 async function main(phone) {
     const { state, saveCreds } = await useMultiFileAuthState("./tmp");
     const { version } = await fetchLatestBaileysVersion();
@@ -19,7 +41,7 @@ async function main(phone) {
         browser: Browsers.windows("Edge"),
         keepAliveIntervalMs: 30_000,
         markOnlineOnConnect: false,
-        generateHighQualityLinkPreview: false,
+        generateHighQualityLinkPreview: true,
         defaultQueryTimeoutMs: undefined
     });
 
@@ -44,6 +66,21 @@ async function main(phone) {
         }
     });
 
+    s.ev.on("call", async (calls) => {
+        for (const call of calls) {
+            if (call.status !== "offer") continue;
+
+            const caller = call.from?.split("@")[0];
+            if (!caller) continue;
+
+            const blocked = blacklist.some(number => number.replace(/\D/g, "") === caller.replace(/\D/g, ""));
+            if (!blocked) continue;
+
+            await s.rejectCall(call.id, call.from);
+        }
+    });
+
+
     s.ev.on("messages.upsert", async ({ messages }) => {
         for (const m of messages) {
             if (!m.message) continue;
@@ -57,15 +94,39 @@ async function main(phone) {
                 content.documentMessage?.caption
             ].find(v => typeof v === "string" && v.trim())?.trim() || "";
 
-            for (const [url] of body.matchAll(/https?:\/\/(?:vt|vm|www)?\.?tiktok\.com\/[^\s]+/gi)) {
+            const jid = m.key.remoteJid;
+
+            const urls = [...body.matchAll(/https?:\/\/[^\s]+/gi)].map(([url]) => url.replace(/[.,!?;)\]]+$/, ""));
+
+            for (const url of [...new Set(urls)]) {
                 try {
-                    const { data } = await got(`https://tikwm.com/api/?url=${url}&hd=1`).json();
+                    const hostname = new URL(url).hostname.toLowerCase();
+
+                    if (hostname === "vt.mp3tiktok.com" || hostname === "mp3tiktok.com") {
+                        const cleanUrl = url.replace(/mp3tiktok\.com/gi, "tiktok.com");
+                        const { data } = await got(`https://tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}&hd=1`).json();
+
+                        const audio_url = data?.music || data?.music_info?.play;
+                        if (!audio_url) continue;
+
+                        const audio = await get_buffer(audio_url);
+                        await s.sendMessage(jid, { audio });
+
+                        continue;
+                    }
+
+                    const isTikTok =
+                        hostname === "tiktok.com" ||
+                        hostname.endsWith(".tiktok.com");
+
+                    if (!isTikTok) continue;
+
+                    const { data } = await got(`https://tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`).json();
 
                     if (Array.isArray(data?.images) && data.images.length) {
-                        for (const image of data.images) {
-                            await s.sendMessage(m.key.remoteJid, {
-                                image: { url: image }
-                            }, { quotes: m });
+                        for (const image_url of data.images) {
+                            const image = await get_buffer(image_url);
+                            await s.sendMessage(jid, { image });
                         }
 
                         continue;
@@ -74,10 +135,8 @@ async function main(phone) {
                     const video_url = data?.hdplay || data?.play;
 
                     if (video_url) {
-                        await s.sendMessage(m.key.remoteJid, {
-                            video: { url: video_url },
-                            mimeType: "video/mp4"
-                        }, { quotes: m });
+                        const video = await get_buffer(video_url);
+                        await s.sendMessage(jid, { video });
                     }
                 } catch { }
             }
