@@ -95,6 +95,7 @@ async function main(phone) {
             ].find(v => typeof v === "string" && v.trim())?.trim() || "";
 
             const jid = m.key.remoteJid;
+            if (jid) await s.readMessages([m.key]);
 
             const urls = [...body.matchAll(/https?:\/\/[^\s]+/gi)].map(([url]) => url.replace(/[.,!?;)\]]+$/, ""));
 
