@@ -15,7 +15,7 @@ async function get_buffer(url) {
         const response = await got.get(url, {
             responseType: "buffer",
             timeout: { request: 20000 },
-            retry: { limit: 1 }
+            retry: { limit: 1 },
             headers: { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" }
         });
 
