@@ -110,7 +110,12 @@ async function main(phone) {
                         if (!audio_url) continue;
 
                         const audio = await get_buffer(audio_url);
-                        await s.sendMessage(jid, { audio });
+                        await s.sendMessage(jid, {
+                            audio,
+                            mimetype: "audio/mpeg",
+                            fileName: "tiktok-audio.mp3",
+                            ptt: false
+                        });
 
                         continue;
                     }
@@ -126,7 +131,11 @@ async function main(phone) {
                     if (Array.isArray(data?.images) && data.images.length) {
                         for (const image_url of data.images) {
                             const image = await get_buffer(image_url);
-                            await s.sendMessage(jid, { image });
+                            await s.sendMessage(jid, {
+                                image,
+                                mimetype: "image/jpeg",
+                                fileName: "image.jpg"
+                            });
                         }
 
                         continue;
@@ -136,7 +145,11 @@ async function main(phone) {
 
                     if (video_url) {
                         const video = await get_buffer(video_url);
-                        await s.sendMessage(jid, { video });
+                        await s.sendMessage(jid, {
+                            video,
+                            mimetype: "video/mp4",
+                            fileName: "video.mp4"
+                        });
                     }
                 } catch { }
             }
