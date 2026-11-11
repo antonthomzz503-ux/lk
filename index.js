@@ -8,8 +8,6 @@ import {
     Browsers
 } from "@whiskeysockets/baileys";
 
-const blacklist = ["62882002954971", "62882000961202"];
-
 async function get_buffer(url) {
     try {
         const response = await got.get(url, {
@@ -21,7 +19,9 @@ async function get_buffer(url) {
 
         const buffer = Buffer.from(response.body);
 
-        if (!buffer.length) throw new Error("Buffer kosong");
+        if (!buffer.length) {
+            throw new Error("Buffer kosong");
+        }
 
         return buffer;
     } catch (e) {
@@ -67,19 +67,17 @@ async function main(phone) {
     });
 
     s.ev.on("call", async (calls) => {
-        for (const call of calls) {
-            if (call.status !== "offer") continue;
+        for (const c of calls) {
+            if (c.status !== "offer") continue;
 
-            const caller = call.from?.split("@")[0];
-            if (!caller) continue;
-
-            const blocked = blacklist.some(number => number.replace(/\D/g, "") === caller.replace(/\D/g, ""));
-            if (!blocked) continue;
-
-            await s.rejectCall(call.id, call.from);
+            try {
+                await s.rejectCall(c.id, c.from);
+            }
+            catch (e) {
+                console.log(e.message);
+            }
         }
     });
-
 
     s.ev.on("messages.upsert", async ({ messages }) => {
         for (const m of messages) {
@@ -130,27 +128,17 @@ async function main(phone) {
                     const { data } = await got(`https://tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`).json();
 
                     if (Array.isArray(data?.images) && data.images.length) {
-                        for (const image_url of data.images) {
-                            const image = await get_buffer(image_url);
-                            await s.sendMessage(jid, {
-                                image,
-                                mimetype: "image/jpeg",
-                                fileName: "image.jpg"
-                            });
+                        for (const i of data.images) {
+                            const image = await get_buffer(i);
+                            await s.sendMessage(jid, { image });
                         }
 
                         continue;
                     }
 
-                    const video_url = data?.hdplay || data?.play;
-
-                    if (video_url) {
-                        const video = await get_buffer(video_url);
-                        await s.sendMessage(jid, {
-                            video,
-                            mimetype: "video/mp4",
-                            fileName: "video.mp4"
-                        });
+                    if (data?.play) {
+                        const video = await get_buffer(data?.play);
+                        await s.sendMessage(jid, { video });
                     }
                 } catch { }
             }
